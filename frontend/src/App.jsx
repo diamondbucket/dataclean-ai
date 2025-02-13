@@ -3,6 +3,7 @@ import { FiUpload, FiDatabase, FiSettings, FiZap, FiChevronDown, FiAlertTriangle
 import { motion, AnimatePresence } from 'framer-motion';
 import FileUpload from './components/FileUpload';
 import AnalysisResults from './components/AnalysisResults';
+import AnalysisPreview from './components/AnalysisPreview';
 import axios from 'axios';
 
 const App = () => {
@@ -68,8 +69,9 @@ const App = () => {
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
       {/* New Header */}
-      <header className="bg-gradient-to-r from-gray-800 to-gray-900 shadow-xl">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+      <header className="bg-gradient-to-r from-gray-800 to-gray-900 shadow-xl relative overflow-hidden">
+        <div className="absolute inset-0 bg-amber-400/10 blur-[100px]"></div>
+      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex items-center justify-between relative">
           <div className="flex items-center space-x-3">
             <FiZap className="h-8 w-8 text-amber-400" />
             <h1 className="text-2xl font-bold">FORGE</h1>
@@ -92,7 +94,7 @@ const App = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="bg-gray-800 rounded-xl p-6 mb-8 relative"
+              className="bg-gray-800 rounded-xl p-6 mb-8 relative border border-amber-400/20 shadow-[0_0_30px_-10px_rgba(251,191,36,0.1)]"
             >
               <button 
                 onClick={() => setShowTutorial(false)}
@@ -130,12 +132,12 @@ const App = () => {
 
         {!session ? (
     <div className="space-y-8">
-      <div className="bg-gray-800 rounded-xl shadow-2xl p-8">
-        <h2 className="text-xl font-bold mb-6">Ignite Your Data</h2>
-        <div className="grid grid-cols-2 gap-8">
-          <div className="col-span-1">
-            <FileUpload onUpload={handleFileUpload} />  {/* Updated prop name */}
-          </div>
+    <div className="bg-gray-800 rounded-xl shadow-2xl p-8 border border-amber-400/20 shadow-[0_0_40px_-15px_rgba(251,191,36,0.15)]">
+      <h2 className="text-xl font-bold mb-6 text-amber-400">Ignite Your Data</h2>
+      <div className="grid grid-cols-2 gap-8">
+        <div className="col-span-1">
+          <FileUpload onUpload={handleFileUpload} />
+        </div>
                 <div className="col-span-1 flex flex-col justify-center">
                   <button
                     onClick={loadSampleDataset}
@@ -161,7 +163,7 @@ const App = () => {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* Enhanced Sidebar */}
             <div className="lg:col-span-1 space-y-6">
-              <div className="bg-gray-800 rounded-xl p-6">
+            <div className="bg-gray-800 rounded-xl p-6 border border-amber-400/20 shadow-[0_0_30px_-10px_rgba(251,191,36,0.1)]">
                 <h3 className="font-bold mb-4 text-amber-400">Dataset Stats</h3>
                 <div className="space-y-4">
                   <StatCard 
@@ -193,7 +195,7 @@ const App = () => {
                 onSubmit={handleSubmit}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="bg-gray-800 rounded-xl shadow-xl p-6 space-y-6"
+                className="bg-gray-800 rounded-xl p-6 border border-amber-400/20 shadow-[0_0_40px_-15px_rgba(251,191,36,0.2)]"
               >
                 {/* Form inputs with enhanced styling */}
                 <div>
@@ -268,10 +270,14 @@ const App = () => {
               </motion.form>
 
               {analysis && (
-                <AnalysisResults 
-                  analysis={analysis} 
-                  onApply={() => {/* Implement action */}}
-                />
+                <div className="space-y-6">
+                  <AnalysisPreview analysis={analysis} />
+                  <AnalysisResults 
+                    analysis={analysis} 
+                    onApply={() => {/* Implement action */}}
+                    className="border border-amber-400/20 shadow-[0_0_40px_-15px_rgba(251,191,36,0.2)]"
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -283,7 +289,8 @@ const App = () => {
 
 // New StatCard Component
 const StatCard = ({ label, value, icon }) => (
-  <div className="bg-gray-700 rounded-lg p-4 flex items-center justify-between">
+  <div className="bg-gray-700 rounded-lg p-4 flex items-center justify-between 
+                border border-amber-400/10 shadow-[0_0_20px_-5px_rgba(251,191,36,0.1)]">
     <div>
       <p className="text-sm text-gray-400">{label}</p>
       <p className="text-2xl font-medium">{value}</p>
