@@ -1,1 +1,28 @@
 @import "tailwindcss";
+
+.glow-effect {
+    box-shadow: 0 0 15px rgba(255,255,255,0.2);
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+  
+  @keyframes glow {
+    from {
+      box-shadow: 0 0 5px rgba(255,255,255,0.2);
+    }
+    to {
+      box-shadow: 0 0 20px rgba(255,255,255,0.4);
+    }
+  }
+
+  @layer components {
+    .glow-box {
+      @apply relative overflow-hidden;
+      &::before {
+        @apply content-[''] absolute inset-0 bg-green-400/10 blur-[100px] pointer-events-none;
+      }
+    }
+    
+    .green-gradient-text {
+      @apply bg-gradient-to-r from-green-300 to-green-400 bg-clip-text text-transparent;
+    }
+  }

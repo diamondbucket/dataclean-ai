@@ -22,13 +22,16 @@ const FileUpload = ({ onUpload }) => {
             body: formData
           });
           
-          if (!response.ok) throw new Error('Upload failed');
-          const data = await response.json();
+          if (!response.ok) {
+            const errorData = await response.json();  // Add error response parsing
+            throw new Error(errorData.error || 'Upload failed');
+          }
           
-          onUpload(data);  // Call parent component's handler
+          const data = await response.json();
+          onUpload(data);  // This should pass through to parent
         } catch (error) {
           console.error('Upload error:', error);
-          alert(error.message);
+          alert(error.message);  // Show actual error message from backend
         } finally {
           setIsUploading(false);
         }
@@ -55,8 +58,8 @@ const FileUpload = ({ onUpload }) => {
         className={`p-8 border-2 border-dashed rounded-xl transition-all
           ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}
           ${isDragActive ? 
-            'border-amber-400 bg-amber-900/20' : 
-            'border-gray-600 hover:border-amber-400'}
+            'border-green-400 bg-green-900/20' : 
+            'border-gray-600 hover:border-green-400'}
           ${rejectedFiles.length > 0 ? 'border-red-400' : ''}`}
         disabled={isUploading}
       >
@@ -64,12 +67,12 @@ const FileUpload = ({ onUpload }) => {
         <div className="text-center space-y-4">
           {isUploading ? (
             <div className="flex flex-col items-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-400"></div>
-              <p className="mt-4 text-amber-400">Processing dataset...</p>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400"></div>
+              <p className="mt-4 text-green-400">Processing dataset...</p>
             </div>
           ) : (
             <>
-              <FiUploadCloud className="mx-auto h-12 w-12 text-amber-400" />
+              <FiUploadCloud className="mx-auto h-12 w-12 text-green-400" />
               <div>
                 <p className="font-medium">
                   {isDragActive ? 'Release to upload' : 'Drag & drop dataset'}

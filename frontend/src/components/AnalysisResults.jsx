@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { FiChevronRight, FiClipboard, FiZap } from 'react-icons/fi';
+import { FiChevronRight, FiClipboard, FiZap, FiCheckCircle } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 
-const AnalysisResults = ({ analysis, onApply }) => {
+const AnalysisResults = ({ analysis, onApply, sessionId }) => {
   const [copied, setCopied] = useState(false);
   const sections = analysis.split('\n\n').filter(Boolean);
   const [openSection, setOpenSection] = useState(0);
+  const [applied, setApplied] = useState(false);
 
   const copyToClipboard = async (text) => {
     await navigator.clipboard.writeText(text);
@@ -42,20 +43,63 @@ const AnalysisResults = ({ analysis, onApply }) => {
     }
   };
 
+  const handleApply = async () => {
+    try {
+      // Check for destructive actions
+      const destructiveCount = analysis.split('\n').filter(line => 
+        line.toLowerCase().includes('drop') || 
+        line.toLowerCase().includes('remove') ||
+        line.toLowerCase().includes('filter')
+      ).length;
+
+      if (destructiveCount > 0) {
+        const confirm = window.confirm(
+          `This will apply ${destructiveCount} destructive operations. Are you sure?`
+        );
+        if (!confirm) return;
+      }
+
+      setApplied(false);
+      const response = await axios.post(
+        `http://localhost:5000/apply/${sessionId}`,
+        { recommendations: analysis }
+      );
+      
+      // Handle results
+      if (response.data.results.errors.length > 0) {
+        alert(`Some errors occurred:\n${response.data.results.errors.join('\n')}`);
+      }
+      
+      onApply(response.data.updatedData);
+      setApplied(true);
+    } catch (error) {
+      console.error('Apply error:', error);
+      alert(error.response?.data?.error || 'Application failed');
+    }
+  };
+
   return (
-    <div className="bg-gray-800 rounded-xl shadow-xl overflow-hidden">
-      <div className="p-6 border-b border-gray-700 flex items-center justify-between">
-        <h3 className="text-lg font-bold flex items-center space-x-2">
-          <FiZap className="text-amber-400" />
-          <span>AI Recommendations</span>
-        </h3>
-        <button
-          onClick={() => copyToClipboard(analysis)}
-          className="text-amber-400 hover:text-amber-300 flex items-center space-x-2"
-        >
-          <FiClipboard />
-          <span className="text-sm">{copied ? 'Copied!' : 'Copy'}</span>
-        </button>
+    <div className="bg-black rounded-xl overflow-hidden border-2 border-green-400/20 shadow-[0_0_30px_-10px_rgba(255,255,255,0.1)]">
+      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <FiZap className="text-green-400" />
+          <h3 className="text-lg font-bold">AI Recommendations</h3>
+        </div>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleApply}
+            className="text-sm bg-green-400/10 text-green-300 px-4 py-2 rounded-lg hover:bg-green-400/20 flex items-center space-x-2"
+          >
+            <FiZap className="flex-shrink-0" />
+            <span>Apply All Recommendations</span>
+          </button>
+          {applied && (
+            <div className="text-green-400 flex items-center gap-2">
+              <FiCheckCircle />
+              <span className="text-sm">Applied!</span>
+            </div>
+          )}
+        </div>
       </div>
       
       <div className="divide-y divide-gray-700">
@@ -94,18 +138,11 @@ const AnalysisResults = ({ analysis, onApply }) => {
                               key={i}
                               className="flex items-start space-x-3"
                             >
-                              <span className="text-amber-400">▹</span>
+                              <span className="text-green-400">▹</span>
                               <span className="flex-1">{point.trim()}</span>
                             </li>
                           ))}
                         </ul>
-                        <button
-                          onClick={() => onApply(content)}
-                          className="mt-4 text-sm bg-amber-400/10 text-amber-300 px-4 py-2 rounded-lg hover:bg-amber-400/20 flex items-center space-x-2"
-                        >
-                          <FiZap className="flex-shrink-0" />
-                          <span>Apply Recommendations</span>
-                        </button>
                       </div>
                     </motion.div>
                   )}
