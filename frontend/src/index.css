@@ -25,4 +25,8 @@
     .green-gradient-text {
       @apply bg-gradient-to-r from-green-300 to-green-400 bg-clip-text text-transparent;
     }
+  } 
+
+  body {
+    background-color: #000000;
   }

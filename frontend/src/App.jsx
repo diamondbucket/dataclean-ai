@@ -6,6 +6,8 @@ import AnalysisResults from './components/AnalysisResults';
 import AnalysisPreview from './components/AnalysisPreview';
 import axios from 'axios';
 import QuickActions from './components/QuickActions';
+import DeployModel from './components/DeployModel';
+import ModelTraining from './components/ModelTraining';
 
 const QUICK_ACTIONS = [
   {
@@ -47,22 +49,13 @@ const App = () => {
     processingGoal: 'Data Cleaning',
     customGoal: ''
   });
-
-  // Add this state
   const [appliedData, setAppliedData] = useState(null);
+  const [recommendationsGenerated, setRecommendationsGenerated] = useState(false);
+  const [navigateToDeploy, setNavigateToDeploy] = useState(false);
+  const [showModelTraining, setShowModelTraining] = useState(false);
 
   // Add state for quick actions
   const [quickAction, setQuickAction] = useState('');
-
-  const handleUpload = (uploadData) => {
-    setSession(uploadData);
-    setAnalysis(null);
-    setFormData({
-      businessProblem: '',
-      processingGoal: 'Data Cleaning',
-      customGoal: ''
-    });
-  };
 
   // Add state for tutorial steps
   const [showTutorial, setShowTutorial] = useState(true);
@@ -80,6 +73,18 @@ const App = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUpload = (uploadData) => {
+    setSession(uploadData);
+    setAnalysis(null);
+    setFormData({
+      businessProblem: '',
+      processingGoal: 'Data Cleaning',
+      customGoal: ''
+    });
+    setRecommendationsGenerated(false);
+    setAppliedData(null);
   };
 
   const handleSubmit = async (e) => {
@@ -155,6 +160,35 @@ const App = () => {
 
   // Add to download button logic
   const canDownload = appliedData?.downloadAvailable || session?.processed;
+
+  const handleGenerateRecommendations = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const response = await axios.post(`http://localhost:5000/analyze/${session.session_id}`, {
+        business_problem: formData.businessProblem,
+        processing_goal: formData.processingGoal,
+        custom_goal: formData.customGoal
+      });
+      setAnalysis(response.data.analysis);
+      setRecommendationsGenerated(true); // Set to true when recommendations are generated
+    } catch (error) {
+      console.error('Analysis error:', error);
+      alert(error.response?.data?.error || 'Analysis failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeploy = () => {
+    setShowModelTraining(true);
+  };
+
+  const handleModelDeploy = (selectedModel) => {
+    console.log('Deploying model:', selectedModel);
+    // Handle the deployment logic here
+    setShowModelTraining(false);
+  };
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
@@ -281,20 +315,8 @@ const App = () => {
 
             {/* Main Analysis Area */}
             <div className="lg:col-span-3 space-y-6">
-              <QuickActions 
-                onApply={(newData) => {
-                  setAppliedData(newData);
-                  setSession(prev => ({
-                    ...prev,
-                    preview: newData.preview,
-                    shape: newData.shape
-                  }));
-                }}
-                quickActions={QUICK_ACTIONS}
-                sessionId={session?.session_id}
-              />
               <motion.form 
-                onSubmit={handleSubmit}
+                onSubmit={handleGenerateRecommendations}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="bg-black rounded-xl p-6 border-2 border-green-400/20 shadow-[0_0_40px_-15px_rgba(34,197,94,0.3)]"
@@ -376,16 +398,45 @@ const App = () => {
                   <AnalysisPreview analysis={analysis} />
                   <AnalysisResults 
                     analysis={analysis} 
-                    onApply={(newData) => {
-                      setAppliedData(newData);
-                      setSession(prev => ({
-                        ...prev,
-                        preview: newData.preview,
-                        shape: newData.shape
-                      }));
+                    onApply={async () => {
+                      try {
+                        // Make API call to apply recommendations
+                        const response = await axios.post(`http://localhost:5000/apply-recommendations/${session?.session_id}`);
+                        
+                        if (response.data) {
+                          setAppliedData(response.data);
+                          setSession(prev => ({
+                            ...prev,
+                            preview: response.data.preview,
+                            shape: response.data.shape
+                          }));
+                          return true; // Return true to indicate success
+                        }
+                      } catch (error) {
+                        console.error('Error applying recommendations:', error);
+                        alert('Failed to apply recommendations');
+                        return false; // Return false to indicate failure
+                      }
                     }}
                     sessionId={session?.session_id}
+                    onDeploy={handleDeploy}
                   />
+                  
+                  {recommendationsGenerated && (
+                    <QuickActions 
+                      onApply={(newData) => {
+                        setAppliedData(newData);
+                        setSession(prev => ({
+                          ...prev,
+                          preview: newData.preview,
+                          shape: newData.shape
+                        }));
+                      }}
+                      quickActions={QUICK_ACTIONS}
+                      sessionId={session?.session_id}
+                      onDeploy={handleDeploy}
+                    />
+                  )}
                 </div>
               )}
 
@@ -410,6 +461,14 @@ const App = () => {
               )}
             </div>
           </div>
+        )}
+
+        {showModelTraining && (
+          <ModelTraining
+            sessionId={session?.session_id}
+            onClose={() => setShowModelTraining(false)}
+            onDeploy={handleModelDeploy}
+          />
         )}
       </main>
     </div>
