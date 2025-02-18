@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { FiCheckCircle, FiDownload, FiUpload, FiXCircle, FiSliders, FiCheck, FiX } from 'react-icons/fi';
+import { useState, useEffect } from 'react';
+import { FiCheckCircle, FiDownload, FiUpload, FiXCircle, FiSliders, FiCheck, FiX, FiZap, FiRefreshCw } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import axios from 'axios';
 import PropTypes from 'prop-types';
@@ -22,7 +22,7 @@ const DeployModel = ({ sessionId, onClose }) => {
   const [modelCard, setModelCard] = useState(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [showRefineModal, setShowRefineModal] = useState(false);
+  const [showRefinement, setShowRefinement] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [parameters, setParameters] = useState({
@@ -37,6 +37,21 @@ const DeployModel = ({ sessionId, onClose }) => {
     recall: 87,
     f1Score: 85
   });
+  const [accuracy, setAccuracy] = useState(75);
+  const [parametersApplied, setParametersApplied] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Calculate accuracy based on parameters
+    const newAccuracy = Math.min(
+      95,
+      70 +
+        (parameters.epochs / 20) * 10 +
+        (parameters.learningRate * 1000) / 2 -
+        parameters.dropout * 20
+    );
+    setAccuracy(Math.round(newAccuracy));
+  }, [parameters]);
 
   const handleTrainModel = async () => {
     if (!selectedAlgorithm) {
@@ -167,16 +182,22 @@ const DeployModel = ({ sessionId, onClose }) => {
     };
   };
 
-  const handleParameterChange = (e) => {
-    const { name, value } = e.target;
-    const newParameters = {
-      ...parameters,
-      [name]: parseFloat(value)
-    };
-    setParameters(newParameters);
+  const handleParameterChange = (name, value) => {
+    setParameters(prev => {
+      // Apply thresholds
+      if (name === 'epochs' && value > 25) {
+        value = 25;
+        alert('Maximum 25 epochs allowed!');
+      }
+      if (name === 'dropout' && value > 0.5) {
+        value = 0.5;
+        alert('Dropout cannot exceed 0.5!');
+      }
+      return { ...prev, [name]: parseFloat(value) };
+    });
     
     // Update performance preview immediately
-    setPerformance(calculatePerformance(newParameters));
+    setPerformance(calculatePerformance(parameters));
     setHasChanges(true);
   };
 
@@ -195,247 +216,157 @@ const DeployModel = ({ sessionId, onClose }) => {
     }
   };
 
+  const applyHandler = async () => {
+    setLoading(true);
+    try {
+      const response = await axios.post(`/api/refine-model/${sessionId}`, {
+        parameters,
+        accuracy
+      });
+      
+      if (response.data.success) {
+        setParametersApplied(true);
+        setShowRefinement(false);
+        alert('Model refined successfully!');
+      }
+    } catch (error) {
+      console.error('Refinement failed:', error);
+      alert('Failed to apply parameters');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="my-8 bg-black rounded-xl p-6 border-2 border-green-400/20 shadow-[0_0_30px_-10px_rgba(128,128,128,0.5)] max-w-4xl w-full">
-        <button
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center p-4">
+      <div className="bg-gray-900 rounded-xl p-6 max-w-2xl w-full relative">
+        <button 
           onClick={onClose}
-          className="absolute top-4 right-4 text-green-400 hover:text-green-300"
+          className="absolute top-4 right-4 text-gray-400 hover:text-white"
         >
-          <FiX size={24} />
+          &times;
         </button>
 
-        <h2 className="text-2xl font-bold text-green-400 mb-6">Deploy Model</h2>
+        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+          <FiZap className="text-green-400" />
+          Model Deployment
+        </h2>
 
-        {!modelTrained ? (
-          <>
-            <div className="mb-6">
-              <label className="block text-green-300 mb-2">Select Algorithm</label>
-              <select
-                value={selectedAlgorithm}
-                onChange={(e) => setSelectedAlgorithm(e.target.value)}
-                className="w-full bg-black border border-green-400/20 rounded-lg px-4 py-3 text-green-300 focus:ring-2 focus:ring-green-400"
-              >
-                <option value="">Choose an algorithm...</option>
-                {algorithms.map((algo) => (
-                  <option key={algo} value={algo}>
-                    {algo}
-                  </option>
-                ))}
-              </select>
+        <div className="flex gap-4 mb-6">
+          <button
+            onClick={() => {
+              setShowRefinement(true);
+              setParametersApplied(false);
+            }}
+            className="bg-green-400/20 text-green-400 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-400/30"
+          >
+            <FiSliders /> Refine Performance
+          </button>
+        </div>
+
+        {showRefinement && (
+          <div className="mb-6 p-4 bg-gray-800 rounded-lg">
+            <h3 className="text-lg font-semibold mb-4">Performance Tuner</h3>
+            
+            <div className="space-y-4">
+              <div className="bg-gray-700 p-4 rounded-lg">
+                <div className="flex justify-between mb-2">
+                  <span>Model Accuracy: {accuracy}%</span>
+                </div>
+                <div className="h-2 bg-gray-600 rounded-full">
+                  <div 
+                    className="h-full bg-green-400 rounded-full transition-all duration-300"
+                    style={{ width: `${accuracy}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block mb-2">Epochs ({parameters.epochs})</label>
+                  <input
+                    type="range"
+                    min="5"
+                    max="30"
+                    step="1"
+                    value={parameters.epochs}
+                    onChange={(e) => handleParameterChange('epochs', e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-2">
+                    Learning Rate ({parameters.learningRate.toFixed(4)})
+                  </label>
+                  <input
+                    type="range"
+                    min="0.0001"
+                    max="0.01"
+                    step="0.0001"
+                    value={parameters.learningRate}
+                    onChange={(e) => handleParameterChange('learningRate', e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-2">
+                    Batch Size ({parameters.batchSize})
+                  </label>
+                  <input
+                    type="range"
+                    min="16"
+                    max="128"
+                    step="8"
+                    value={parameters.batchSize}
+                    onChange={(e) => handleParameterChange('batchSize', e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block mb-2">
+                    Dropout ({parameters.dropout.toFixed(2)})
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="0.5"
+                    step="0.05"
+                    value={parameters.dropout}
+                    onChange={(e) => handleParameterChange('dropout', e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+              </div>
             </div>
 
             <button
-              onClick={handleTrainModel}
-              disabled={isTraining}
-              className="w-full bg-green-400 hover:bg-green-300 text-black px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2"
+              onClick={applyHandler}
+              disabled={loading}
+              className="mt-4 w-full bg-green-400 hover:bg-green-300 text-black py-2 px-4 rounded-lg flex items-center justify-center gap-2"
             >
-              {isTraining ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div>
-                  Training Model...
-                </>
-              ) : (
-                <>Train Model</>
-              )}
+              {loading ? 'Applying...' : 'Apply Changes'}
             </button>
-          </>
-        ) : (
-          <>
-            {!modelCard?.apiKey ? (
-              <div className="space-y-4">
-                <button
-                  onClick={handleDownloadModel}
-                  disabled={downloading}
-                  className="w-full bg-green-400 hover:bg-green-300 text-black px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2"
-                >
-                  <FiDownload />
-                  Download Model
-                </button>
-                
-                <button
-                  onClick={handleHostModel}
-                  disabled={isDeploying}
-                  className="w-full bg-blue-500 hover:bg-blue-400 text-black px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2"
-                >
-                  {isDeploying ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div>
-                      Deploying Model...
-                    </>
-                  ) : (
-                    <>
-                      <FiUpload />
-                      Host Model
-                    </>
-                  )}
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="bg-black/30 border border-green-400/20 rounded-lg p-4">
-                  <h3 className="text-lg font-bold text-green-400 mb-2">Model Card</h3>
-                  <div className="space-y-2 text-green-300">
-                    <p><strong>Algorithm:</strong> {selectedAlgorithm}</p>
-                    <p><strong>API Key:</strong> {modelCard.apiKey}</p>
-                    <p><strong>Endpoint:</strong> {modelCard.endpoint}</p>
-                  </div>
-                </div>
-                <div className="flex items-center justify-center text-green-400">
-                  <FiCheckCircle className="mr-2" />
-                  Model Successfully Deployed
-                </div>
+          </div>
+        )}
 
-                {/* Model Performance Section */}
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-green-400 mb-3">Model Performance</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-black/30 p-4 rounded-lg border border-green-400/20">
-                      <p className="text-green-300">Accuracy</p>
-                      <p className="text-2xl font-bold text-green-400">{performance.accuracy}%</p>
-                      <div className="h-1 bg-green-400/20 rounded-full mt-2">
-                        <div 
-                          className="h-full bg-green-400 rounded-full transition-all duration-300"
-                          style={{ width: `${performance.accuracy}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="bg-black/30 p-4 rounded-lg border border-green-400/20">
-                      <p className="text-green-300">Precision</p>
-                      <p className="text-2xl font-bold text-green-400">{performance.precision}%</p>
-                      <div className="h-1 bg-green-400/20 rounded-full mt-2">
-                        <div 
-                          className="h-full bg-green-400 rounded-full transition-all duration-300"
-                          style={{ width: `${performance.precision}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="bg-black/30 p-4 rounded-lg border border-green-400/20">
-                      <p className="text-green-300">Recall</p>
-                      <p className="text-2xl font-bold text-green-400">{performance.recall}%</p>
-                      <div className="h-1 bg-green-400/20 rounded-full mt-2">
-                        <div 
-                          className="h-full bg-green-400 rounded-full transition-all duration-300"
-                          style={{ width: `${performance.recall}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="bg-black/30 p-4 rounded-lg border border-green-400/20">
-                      <p className="text-green-300">F1 Score</p>
-                      <p className="text-2xl font-bold text-green-400">{performance.f1Score}%</p>
-                      <div className="h-1 bg-green-400/20 rounded-full mt-2">
-                        <div 
-                          className="h-full bg-green-400 rounded-full transition-all duration-300"
-                          style={{ width: `${performance.f1Score}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Refine Performance Section */}
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-green-400 mb-3">Refine Performance</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-green-300 block mb-2">Learning Rate</label>
-                      <input
-                        type="range"
-                        name="learningRate"
-                        min="0.001"
-                        max="0.1"
-                        step="0.001"
-                        value={parameters.learningRate}
-                        onChange={handleParameterChange}
-                        className="w-full accent-green-400 bg-black/30"
-                      />
-                      <div className="text-green-400 text-sm mt-1">{parameters.learningRate}</div>
-                    </div>
-                    <div>
-                      <label className="text-green-300 block mb-2">Epochs</label>
-                      <input
-                        type="range"
-                        name="epochs"
-                        min="10"
-                        max="500"
-                        step="10"
-                        value={parameters.epochs}
-                        onChange={handleParameterChange}
-                        className="w-full accent-green-400 bg-black/30"
-                      />
-                      <div className="text-green-400 text-sm mt-1">{parameters.epochs}</div>
-                    </div>
-                    <div>
-                      <label className="text-green-300 block mb-2">Batch Size</label>
-                      <input
-                        type="range"
-                        name="batchSize"
-                        min="8"
-                        max="128"
-                        step="8"
-                        value={parameters.batchSize}
-                        onChange={handleParameterChange}
-                        className="w-full accent-green-400 bg-black/30"
-                      />
-                      <div className="text-green-400 text-sm mt-1">{parameters.batchSize}</div>
-                    </div>
-                    <div>
-                      <label className="text-green-300 block mb-2">Dropout Rate</label>
-                      <input
-                        type="range"
-                        name="dropout"
-                        min="0"
-                        max="0.5"
-                        step="0.1"
-                        value={parameters.dropout}
-                        onChange={handleParameterChange}
-                        className="w-full accent-green-400 bg-black/30"
-                      />
-                      <div className="text-green-400 text-sm mt-1">{parameters.dropout}</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-4">
-                  <button
-                    onClick={handleRefine}
-                    disabled={!hasChanges || isRefining}
-                    className={`flex-1 flex items-center justify-center gap-2 bg-black border border-green-400/20 text-green-400 px-6 py-3 rounded-lg transition-colors ${
-                      hasChanges && !isRefining ? 'hover:bg-green-400/10' : 'opacity-50 cursor-not-allowed'
-                    }`}
-                  >
-                    {isRefining ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-400 border-t-transparent" />
-                    ) : (
-                      <FiCheck />
-                    )}
-                    Apply Changes
-                  </button>
-                  <button
-                    onClick={handleDownloadModel}
-                    disabled={downloading || hasChanges}
-                    className={`flex-1 flex items-center justify-center gap-2 bg-black border border-green-400/20 text-green-400 px-6 py-3 rounded-lg transition-colors ${
-                      !downloading && !hasChanges ? 'hover:bg-green-400/10' : 'opacity-50 cursor-not-allowed'
-                    }`}
-                  >
-                    {downloading ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-400 border-t-transparent" />
-                    ) : (
-                      <FiDownload />
-                    )}
-                    Download Model
-                  </button>
-                  <button
-                    onClick={onClose}
-                    className="flex-1 flex items-center justify-center gap-2 bg-black border border-green-400/20 text-green-400 px-6 py-3 rounded-lg transition-colors hover:bg-green-400/10"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
+        {parametersApplied && (
+          <div className="mt-6 flex gap-4 justify-end">
+            <button
+              onClick={() => console.log('Download model logic')}
+              className="bg-green-400 hover:bg-green-300 text-black px-6 py-2 rounded-lg flex items-center gap-2"
+            >
+              <FiDownload /> Download Model
+            </button>
+            <button
+              onClick={() => console.log('Deploy model logic')}
+              className="bg-green-400 hover:bg-green-300 text-black px-6 py-2 rounded-lg flex items-center gap-2"
+            >
+              <FiZap /> Deploy Model
+            </button>
+          </div>
         )}
       </div>
     </div>

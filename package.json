@@ -1,6 +1,12 @@
 {
+  "name": "dataclean-ai",
+  "version": "1.0.0",
+  "description": "AI Data Cleaning Tool",
+  "scripts": {
+    "start": "node start-servers.js",
+    "ngrok": "node start-ngrok.js"
+  },
   "dependencies": {
-    "@heroicons/react": "^2.2.0",
-    "framer-motion": "^12.4.2"
+    "ngrok": "^5.0.0-beta.2"
   }
 }

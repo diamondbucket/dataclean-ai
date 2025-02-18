@@ -8,6 +8,7 @@ import axios from 'axios';
 import QuickActions from './components/QuickActions';
 import DeployModel from './components/DeployModel';
 import ModelTraining from './components/ModelTraining';
+import ModelDeployedModal from './components/ModelDeployedModal';
 
 const QUICK_ACTIONS = [
   {
@@ -53,6 +54,8 @@ const App = () => {
   const [recommendationsGenerated, setRecommendationsGenerated] = useState(false);
   const [navigateToDeploy, setNavigateToDeploy] = useState(false);
   const [showModelTraining, setShowModelTraining] = useState(false);
+  const [showDeployedModal, setShowDeployedModal] = useState(false);
+  const [deployedModel, setDeployedModel] = useState(null);
 
   // Add state for quick actions
   const [quickAction, setQuickAction] = useState('');
@@ -184,10 +187,27 @@ const App = () => {
     setShowModelTraining(true);
   };
 
-  const handleModelDeploy = (selectedModel) => {
-    console.log('Deploying model:', selectedModel);
-    // Handle the deployment logic here
-    setShowModelTraining(false);
+  const handleModelDeploy = async (modelData) => {
+    try {
+      // Your deployment API call
+      const response = await axios.post('/api/deploy-model', modelData);
+      
+      if (response.data.success) {
+        // Set the deployed model data
+        setDeployedModel({
+          id: response.data.modelId,
+          accuracy: response.data.accuracy || 92.4,
+          endpoint: response.data.endpoint || 'https://api.example.com/models/model-v1',
+          apiKey: response.data.apiKey || 'sk_mchs3ckwxf'
+        });
+        
+        // Show the deployment success modal
+        setShowDeployedModal(true);
+      }
+    } catch (error) {
+      console.error('Deployment failed:', error);
+      alert('Failed to deploy model');
+    }
   };
 
   return (
@@ -292,12 +312,12 @@ const App = () => {
                 <div className="space-y-4">
                   <StatCard 
                     label="Rows" 
-                    value={session.shape[0]} 
+                    value={session?.shape?.[0] || 0} 
                     icon={<FiDatabase />}
                   />
                   <StatCard
                     label="Columns"
-                    value={session.shape[1]}
+                    value={session?.shape?.[1] || 0}
                     icon={<FiSettings />}
                   />
                   {/* Add more stats as needed */}
@@ -468,6 +488,13 @@ const App = () => {
             sessionId={session?.session_id}
             onClose={() => setShowModelTraining(false)}
             onDeploy={handleModelDeploy}
+          />
+        )}
+
+        {showDeployedModal && deployedModel && (
+          <ModelDeployedModal
+            model={deployedModel}
+            onClose={() => setShowDeployedModal(false)}
           />
         )}
       </main>
